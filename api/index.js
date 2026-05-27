@@ -7,7 +7,6 @@ export default async function handler(req, res) {
 
   let browser = null;
   try {
-    // Tải Chromium bản chuẩn từ server (Bypass lỗi thiếu thư viện của Vercel Node 20)
     const executablePath = await chromium.executablePath(
       'https://github.com/Sparticuz/chromium/releases/download/v131.0.1/chromium-v131.0.1-pack.tar.br'
     );
@@ -22,10 +21,23 @@ export default async function handler(req, res) {
 
     const page = await browser.newPage();
     
-    // Giả lập trình duyệt chuẩn để chống block
+    // --- TỐI ƯU HÓA: CHẶN TẢI HÌNH ẢNH, CSS, FONT ĐỂ CHỐNG TIMEOUT ---
+    await page.setRequestInterception(true);
+    page.on('request', (req) => {
+      // Bỏ qua các file nặng, chỉ tập trung tải document, script (JS) và fetch/xhr
+      const resourceType = req.resourceType();
+      if (['image', 'stylesheet', 'font', 'media'].includes(resourceType)) {
+        req.abort();
+      } else {
+        req.continue();
+      }
+    });
+    // -----------------------------------------------------------------
+    
     await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131.0.0.0 Safari/537.36');
     
-    await page.goto(targetUrl, { waitUntil: 'networkidle2', timeout: 8000 });
+    // Đổi 'networkidle2' thành 'domcontentloaded' và tăng timeout cho Chrome lên 20s
+    await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 20000 });
 
     const html = await page.content();
     res.status(200).send(html);
